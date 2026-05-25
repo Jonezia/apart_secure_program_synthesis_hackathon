@@ -1,0 +1,20 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary.dfy	2026-05-24 22:03:52.342035151 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary__3156-3351_SDL_.dfy	2026-05-24 22:04:34.818276283 +0100
+@@ -138,17 +138,6 @@
+   if Less(x, y) {
+     d := Zero;
+     m := x;
+-  } else {
+-    var x0: Unary := x;
+-    d := Zero;
+-    while !Less(x0, y)
+-      invariant Add(Mul(d, y), x0) == x
+-      decreases x0
+-    {
+-      d := Suc(d);
+-      x0 := Sub(x0, y);
+-    }
+-    m := x0;
+   }
+ }
+ 

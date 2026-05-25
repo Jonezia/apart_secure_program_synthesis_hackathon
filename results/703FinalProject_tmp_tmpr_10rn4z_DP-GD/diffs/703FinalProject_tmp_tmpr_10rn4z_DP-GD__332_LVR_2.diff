@@ -1,0 +1,11 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/703FinalProject_tmp_tmpr_10rn4z_DP-GD.dfy	2026-05-24 21:53:10.874687088 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/703FinalProject_tmp_tmpr_10rn4z_DP-GD__332_LVR_2.dfy	2026-05-24 21:54:36.874089355 +0100
+@@ -7,7 +7,7 @@
+   requires noise_scale >= 1.0
+   requires -1.0 <= gradient_norm_bound <= 1.0
+ {
+-  var thetha: array<real> := new real[iterations + 1];
++  var thetha: array<real> := new real[iterations + 2];
+   thetha[0] := *;
+   var alpha: real := 0.0;
+   var tau: real := *;

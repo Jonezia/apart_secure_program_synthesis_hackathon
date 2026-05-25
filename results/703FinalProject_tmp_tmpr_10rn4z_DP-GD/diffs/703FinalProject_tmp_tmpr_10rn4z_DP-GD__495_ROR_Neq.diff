@@ -1,0 +1,11 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/703FinalProject_tmp_tmpr_10rn4z_DP-GD.dfy	2026-05-24 21:53:10.874687088 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/703FinalProject_tmp_tmpr_10rn4z_DP-GD__495_ROR_Neq.dfy	2026-05-24 21:53:27.426762887 +0100
+@@ -14,7 +14,7 @@
+   assume tau >= 0.0;
+   var t: int := 0;
+   var constant: real := size as real * tau;
+-  while t < iterations
++  while t != iterations
+     invariant t <= iterations
+     invariant alpha == t as real * constant
+   {

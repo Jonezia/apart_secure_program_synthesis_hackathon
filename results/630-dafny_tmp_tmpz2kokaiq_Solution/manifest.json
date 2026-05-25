@@ -1,0 +1,16 @@
+{
+  "stem": "630-dafny_tmp_tmpz2kokaiq_Solution",
+  "source": "mutdafny/DafnyBench/DafnyBench/dataset/ground_truth/630-dafny_tmp_tmpz2kokaiq_Solution.dfy",
+  "alive": 0,
+  "killed": 71,
+  "timed_out": 1,
+  "invalid": 5,
+  "equivalent": 0,
+  "total": 77,
+  "weak_spec": 0,
+  "thresholds": {
+    "N_true_positive": 256,
+    "M_total": 4096
+  },
+  "timestamp": "2026-05-24T21:53:10"
+}

@@ -1,0 +1,12 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/703FinalProject_tmp_tmpr_10rn4z_DP-GD.dfy	2026-05-24 21:53:10.874687088 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/703FinalProject_tmp_tmpr_10rn4z_DP-GD__612-632_SWS_.dfy	2026-05-24 21:53:34.482795445 +0100
+@@ -18,8 +18,8 @@
+     invariant t <= iterations
+     invariant alpha == t as real * constant
+   {
+-    var i: int := 0;
+     var beta: real := 0.0;
++    var i: int := 0;
+     var summation_gradient: real := 0.0;
+     while i < size
+       invariant i <= size

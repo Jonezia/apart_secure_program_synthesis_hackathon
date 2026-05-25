@@ -1,0 +1,12 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary.dfy	2026-05-24 22:03:52.342035151 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary__3677-3683_SWS_.dfy	2026-05-24 22:04:46.926345286 +0100
+@@ -163,8 +163,8 @@
+     assert Add(Zero, x) == x;
+     assert Mul(Zero, y) == Zero;
+     assert Add(Mul(Zero, y), x) == x;
+-    d := Zero;
+     m := x;
++    d := Zero;
+     assert Add(Mul(d, y), m) == m;
+     assert Less(m, y);
+     assert Add(Mul(d, y), m) == x && Less(m, y);

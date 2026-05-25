@@ -1,0 +1,11 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary.dfy	2026-05-24 22:03:52.342035151 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary__3218_VER_d.dfy	2026-05-24 22:06:52.657068061 +0100
+@@ -141,7 +141,7 @@
+   } else {
+     var x0: Unary := x;
+     d := Zero;
+-    while !Less(x0, y)
++    while !Less(x0, d)
+       invariant Add(Mul(d, y), x0) == x
+       decreases x0
+     {

@@ -1,0 +1,11 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/630-dafny_tmp_tmpz2kokaiq_Solution.dfy	2026-05-24 21:21:23.868988552 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/630-dafny_tmp_tmpz2kokaiq_Solution__664_ROR_Neq.dfy	2026-05-24 21:33:27.774721890 +0100
+@@ -23,7 +23,7 @@
+     mid := (high + low) / 2;
+     if a[mid] < x {
+       low := mid + 1;
+-    } else if a[mid] > x {
++    } else if a[mid] != x {
+       high := mid - 1;
+     } else {
+       return mid;

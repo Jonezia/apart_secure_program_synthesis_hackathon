@@ -1,0 +1,12 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/703FinalProject_tmp_tmpr_10rn4z_DP-GD.dfy	2026-05-24 21:53:10.874687088 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/703FinalProject_tmp_tmpr_10rn4z_DP-GD__1191-1201_SWS_.dfy	2026-05-24 21:54:05.643940915 +0100
+@@ -30,8 +30,8 @@
+       beta := beta + tau;
+       var eta_hat: real := -gradient_norm_bound;
+       assert gradient_norm_bound + eta_hat == 0.0;
+-      summation_gradient := summation_gradient + gradient + eta;
+       i := i + 1;
++      summation_gradient := summation_gradient + gradient + eta;
+     }
+     alpha := alpha + beta;
+     thetha[t + 1] := thetha[t] - learning_rate * summation_gradient;

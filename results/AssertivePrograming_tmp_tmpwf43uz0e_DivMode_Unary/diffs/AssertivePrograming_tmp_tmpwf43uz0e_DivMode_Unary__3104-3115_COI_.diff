@@ -1,0 +1,11 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary.dfy	2026-05-24 22:03:52.342035151 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary__3104-3115_COI_.dfy	2026-05-24 22:05:14.573503268 +0100
+@@ -135,7 +135,7 @@
+   requires y != Zero
+   ensures Add(Mul(d, y), m) == x && Less(m, y)
+ {
+-  if Less(x, y) {
++  if !Less(x, y) {
+     d := Zero;
+     m := x;
+   } else {

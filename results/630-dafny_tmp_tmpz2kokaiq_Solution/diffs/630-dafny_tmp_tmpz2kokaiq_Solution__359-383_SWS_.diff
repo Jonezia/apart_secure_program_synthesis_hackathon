@@ -1,0 +1,12 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/630-dafny_tmp_tmpz2kokaiq_Solution.dfy	2026-05-24 21:34:46.291235134 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/630-dafny_tmp_tmpz2kokaiq_Solution__359-383_SWS_.dfy	2026-05-24 21:34:52.148273419 +0100
+@@ -13,8 +13,8 @@
+   ensures 0 <= index < a.Length ==> a[index] == x
+   ensures index == -1 ==> forall i: int :: 0 <= i < a.Length ==> a[i] != x
+ {
+-  var low := 0;
+   var high := a.Length - 1;
++  var low := 0;
+   var mid := 0;
+   while low <= high
+     invariant 0 <= low <= high + 1 <= a.Length

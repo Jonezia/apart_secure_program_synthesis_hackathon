@@ -1,0 +1,20 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/703FinalProject_tmp_tmpr_10rn4z_gaussian.dfy	2026-05-24 22:00:51.879029738 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/703FinalProject_tmp_tmpr_10rn4z_gaussian__316_LVR_1__677_VER_q_hat.dfy	2026-05-24 22:03:05.860773067 +0100
+@@ -7,7 +7,7 @@
+   requires size > 0
+   requires arraySquaredSum(q_hat[..]) <= 1.0
+ {
+-  var i: int := 0;
++  var i: int := 1;
+   var alpha: real := arraySquaredSum(q_hat[..1]);
+   var eta: real := 0.0;
+   var eta_hat: real := 0.0;
+@@ -20,7 +20,7 @@
+     eta_hat := -q_hat[i];
+     alpha := arraySquaredSum(q_hat[..i + 1]);
+     assert q_hat[i] + eta_hat == 0.0;
+-    out[i] := q[i] + eta;
++    out[i] := q_hat[i] + eta;
+     i := i + 1;
+   }
+   assert i == size;

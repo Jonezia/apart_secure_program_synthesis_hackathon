@@ -1,0 +1,947 @@
+﻿using System.Numerics;
+using Microsoft.BaseTypes;
+using Microsoft.Dafny;
+using Type = Microsoft.Dafny.Type;
+
+namespace MutDafny.Visitor;
+
+public class PostResolveTargetScanner(string mutationTargetURI, List<string> operatorsInUse, ErrorReporter reporter) 
+    : TargetScanner(mutationTargetURI, operatorsInUse, reporter)
+{
+    private bool _skipChildUOIMutation;
+    private bool _skipChildEVRMutation;
+    private bool _skipChildVERMutation;
+    private bool _skipChildDCRMutation;
+    private bool _skipChildFARMutation;
+    private string _childMethodCallPos = "";
+    private VarDeclStmt? _prevVarDeclStmt = null;
+    private ExprDotName? _childExprDotName;
+    private List<string> _childMethodCallArgTypes = [];
+    private Dictionary<string, Type> _currentScopeVars = [];
+    private List<MethodOrFunction> _declaredMethods = [];
+    private List<ApplySuffix> _methodCalls = [];
+    private readonly List<(string, ClassLikeDecl, Type)> _classFields = []; // field name, class type, field type
+    private readonly List<ExprDotName> _accessedClassFields = [];
+    private Dictionary<string, Type> _currentScopeChildClassVariables = [];
+    private List<(string, int, Type)> _childClassAccessedVariables = [];
+    
+    private void ScanUOITargets(Expression expr) {
+        if (_skipChildUOIMutation) {
+            _skipChildUOIMutation = false;
+            return;
+        }
+        
+        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
+        switch (expr.Type) {
+            case IntType:
+            case RealType:
+                if (ShouldImplement("AOI"))
+                    AddTarget((exprLocation, "AOI", "")); 
+                break;
+            case UserDefinedType uType:
+                if (uType.Name == "nat" && ShouldImplement("AOI"))
+                    AddTarget((exprLocation, "AOI", ""));
+                break;
+            case BoolType:
+                if (ShouldImplement("COI"))
+                    AddTarget((exprLocation, "COI", "")); 
+                break;
+            case BitvectorType:
+                if (ShouldImplement("LOI"))
+                    AddTarget((exprLocation, "LOI", "")); 
+                break;
+        }
+    }
+
+    private void ScanUODTargets(UnaryExpr uExpr) {
+        if (!(uExpr is UnaryOpExpr uOpExpr) || uOpExpr.Op != UnaryOpExpr.Opcode.Not)
+            return;
+        
+        switch (uExpr.Type) {
+            case BoolType:
+                if (ShouldImplement("COD"))
+                    AddTarget(($"{uOpExpr.Center.pos}", "COD", ""));
+                break;
+            case BitvectorType:
+                if (ShouldImplement("LOD"))
+                    AddTarget(($"{uOpExpr.Center.pos}", "LOD", ""));
+                break;
+        }
+    }
+
+    private void ScanLVRTargets(LiteralExpr litExpr) {
+        if (!ShouldImplement("LVR")) return;
+        
+        switch (litExpr.Type) {
+            case IntType:
+                HandleIntegerLiteral(litExpr); break;
+            case RealType:
+                HandleRealLiteral(litExpr); break;
+            case UserDefinedType uType:
+                if (uType.Name == "nat")
+                    HandleIntegerLiteral(litExpr);
+                break;
+            default:
+                if (litExpr is StringLiteralExpr) {
+                    HandleStringLiteral(litExpr);
+                }
+                break;
+        }
+    }
+
+    private void HandleIntegerLiteral(LiteralExpr litExpr) {
+        if (!int.TryParse(litExpr.Value.ToString(), out var numVal))
+            return;
+        
+        AddTarget(($"{litExpr.Center.pos}", "LVR", $"{numVal + 1}"));
+        AddTarget(($"{litExpr.Center.pos}", "LVR", $"{numVal - 1}"));
+        if (numVal == 0 || numVal + 1 == 0 || numVal - 1 == 0)
+            return;
+        AddTarget(($"{litExpr.Center.pos}", "LVR", $"0"));
+    }
+    
+    private void HandleRealLiteral(LiteralExpr litExpr) {
+        if (!double.TryParse(litExpr.Value.ToString(), out var numVal))
+            return;
+        var decimalPlaces = BitConverter.GetBytes(decimal.GetBits((decimal)numVal)[3])[2];
+        var format = "0." + new string('0', decimalPlaces);
+        
+        var incVal = (numVal + 1).ToString(format);
+        incVal = incVal.Contains('.') ? incVal : incVal + ".0";
+        AddTarget(($"{litExpr.Center.pos}", "LVR", incVal));
+
+        var decVal = (numVal - 1).ToString(format);
+        decVal = decVal.Contains('.') ? decVal : decVal + ".0";
+        AddTarget(($"{litExpr.Center.pos}", "LVR", decVal));
+        
+        if (numVal == 0 || numVal + 1 == 0 || numVal - 1 == 0)
+            return;
+        AddTarget(($"{litExpr.Center.pos}", "LVR", $"0.0"));
+    } 
+
+    private void HandleStringLiteral(LiteralExpr litExpr) {
+        var sVal = litExpr.Value.ToString();
+        if (sVal == null) return;
+        
+        var repVal = sVal == "" ? "MutDafny" : "";
+        AddTarget(($"{litExpr.Center.pos}", "LVR", repVal));
+        if (sVal.Length <= 1) return;
+        AddTarget(($"{litExpr.Center.pos}", "LVR", 
+            sVal[0] + "XX" + 
+            sVal.Substring(1, sVal.Length - 2) + 
+            "XX" + sVal[^1]));
+    }
+    
+    private void ScanEVRTargets(Expression expr) {
+        if (!ShouldImplement("EVR")) return;
+        if (_skipChildEVRMutation) return;
+        
+        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
+        switch (expr.Type) {
+            case IntType:
+                AddTarget((exprLocation, "EVR", "int")); break;
+            case RealType:
+                AddTarget((exprLocation, "EVR", "real")); break;
+            case BitvectorType:
+                AddTarget((exprLocation, "EVR", "bv")); break;
+            case CharType:
+                AddTarget((exprLocation, "EVR", "char")); break;
+            case SetType:
+                AddTarget((exprLocation, "EVR", "set")); break;
+            case MultiSetType:
+                AddTarget((exprLocation, "EVR", "multiset")); break;
+            case SeqType:
+                AddTarget((exprLocation, "EVR", "seq")); break;
+            case MapType:
+                AddTarget((exprLocation, "EVR", "map")); break;
+            case UserDefinedType uType:
+                if (uType.Name == "nat") {
+                    AddTarget((exprLocation, "EVR", "int"));
+                } else if (uType.Name == "string") { // string type
+                    AddTarget((exprLocation, "EVR", "string"));
+                } else if (expr.Type.IsArrayType) {
+                    AddTarget((exprLocation, "EVR", "array"));
+                }
+                if (uType.Name[^1] == '?') { // nullable type
+                    AddTarget((exprLocation, "EVR", "null"));
+                }
+                break;
+        }
+    }
+    
+    private void ScanEVRTargets(TypeRhs tpRhs) {
+        if (!ShouldImplement("EVR")) return;
+        if (_skipChildEVRMutation) return;
+        
+        if (tpRhs.Type is UserDefinedType uType && uType.ResolvedClass is NonNullTypeDecl nnTypeDecl && 
+            nnTypeDecl.Class != null) {
+            AddTarget(($"{tpRhs.StartToken.pos}-{tpRhs.EndToken.pos}", "EVR", "null"));
+        }
+    }
+    
+    private void ScanVERTargets(NameSegment nSegExpr) {
+        if (!ShouldImplement("VER")) return;
+
+        foreach (var var in _currentScopeVars) {
+            if (nSegExpr.Name == var.Key) continue;
+            if (nSegExpr.Type.ToString() == var.Value.ToString())
+                AddTarget(($"{nSegExpr.Center.pos}", "VER", var.Key));
+        }
+    }
+    
+    private void ScanCIRTargets(Expression expr) {
+        if (!ShouldImplement("CIR")) return;
+        
+        var exprLocation = $"{expr.StartToken.pos}-{expr.EndToken.pos}";
+        string type, arg;
+        switch (expr) {
+            case DisplayExpression dExpr:
+                type = PrimitiveTypeToStr(dExpr.Type.TypeArgs[0]);
+                if (dExpr.Elements.Count == 0 && type == "") 
+                    return;
+                arg = dExpr.Elements.Count == 0 ? type : "";
+                AddTarget((exprLocation, "CIR", arg)); break;
+            case MapDisplayExpr mDExpr:
+                type = $"{PrimitiveTypeToStr(mDExpr.Type.TypeArgs[0])}-{PrimitiveTypeToStr(mDExpr.Type.TypeArgs[1])}";
+                if (mDExpr.Elements.Count == 0 && type == "") 
+                    return;
+                arg = mDExpr.Elements.Count == 0 ? type : "";
+                AddTarget((exprLocation, "CIR", arg)); break;
+        }
+    }
+
+    private void ScanCIRTargets(TypeRhs tpRhs) {
+        if (!ShouldImplement("CIR")) return;
+        if (tpRhs.ArrayDimensions == null) return;
+
+        var type = PrimitiveTypeToStr(tpRhs.EType);
+        var exprLocation = $"{tpRhs.StartToken.pos}-{tpRhs.EndToken.pos}";
+        var hasInit = (tpRhs.InitDisplay != null && tpRhs.InitDisplay.Count != 0) || tpRhs.ElementInit != null;
+        if (!hasInit && type == "")
+            return;
+        var arg = hasInit ? "" : type;
+        AddTarget((exprLocation, "CIR", arg));
+    }
+
+    private void ScanMethodTargets(ConcreteAssignStatement cAStmt) {
+        ScanMRRTargets(cAStmt);
+        ScanMAPTargets(cAStmt);
+        ScanMNRTargets(cAStmt);
+        ScanMVRTargets(cAStmt);
+    }
+    
+    private void ScanMethodTargets(SuffixExpr suffixExpr) {
+        ScanMRRTargets(suffixExpr);
+        ScanMAPTargets(suffixExpr);
+        ScanMNRTargets(suffixExpr);
+        ScanMVRTargets(suffixExpr);
+    }
+    
+    private void ScanMRRTargets(ConcreteAssignStatement cAStmt) {
+        if (!ShouldImplement("MRR")) return;
+        
+        var typeArg = "";
+        foreach (var lhs in cAStmt.Lhss) {
+            var type = TypeToStr(lhs.Type);
+            if (type == "") {
+                typeArg = "";
+                break;
+            }
+            typeArg = typeArg == "" ? type : $"{typeArg}-{type}";
+        }
+        if (typeArg != "")
+            AddTarget((_childMethodCallPos, "MRR", typeArg));
+    }
+    
+    private void ScanMRRTargets(SuffixExpr suffixExpr) {
+        if (!ShouldImplement("MRR")) return;
+        
+        var type = TypeToStr(suffixExpr.Type);
+        if (type == "")
+            return;
+        AddTarget((_childMethodCallPos, "MRR", type));
+    }
+
+    private void ScanMAPTargets(ConcreteAssignStatement cAStmt) {
+        if (!ShouldImplement("MAP")) return;
+
+        var argProp = "";
+        foreach (var lhs in cAStmt.Lhss) {
+            var type = TypeToStr(lhs.Type);
+            var methodArgPos = _childMethodCallArgTypes.IndexOf(type);
+            if (methodArgPos == -1) {
+                argProp = "";
+                break;
+            }
+            argProp = argProp == "" ? $"{methodArgPos}" : $"{argProp}-{methodArgPos}";
+        }
+        if (argProp != "")
+            AddTarget((_childMethodCallPos, "MAP", argProp));
+    }
+    
+    private void ScanMAPTargets(SuffixExpr suffixExpr) {
+        if (!ShouldImplement("MAP")) return;
+
+        var type = TypeToStr(suffixExpr.Type);
+        var methodArgPos = _childMethodCallArgTypes.IndexOf(type);
+        if (methodArgPos == -1)
+            return;
+        AddTarget((_childMethodCallPos, "MAP", $"{methodArgPos}"));
+    }
+
+    private void ScanMNRTargets(ConcreteAssignStatement cAStmt) {
+        if (!ShouldImplement("MNR") || _childExprDotName == null) 
+            return;
+
+        if (cAStmt.Lhss.Count == 1 && // naked receiver can be applied if the types match or if they are inferred from context
+            cAStmt.Lhss[0].Type.ToString() == _childExprDotName.Lhs.Type.ToString())
+            AddTarget((_childMethodCallPos, "MNR", ""));
+    }
+    
+    private void ScanMNRTargets(SuffixExpr suffixExpr) {
+        if (!ShouldImplement("MNR") || _childExprDotName == null) 
+            return;
+
+        if (suffixExpr.Type != null && suffixExpr.Type.ToString() == _childExprDotName.Lhs.Type.ToString())
+            AddTarget((_childMethodCallPos, "MNR", ""));
+    }
+    
+    private void ScanMCRTargets() {
+        if (!ShouldImplement("MCR")) return;
+        
+        foreach (var methodCall in _methodCalls) {
+            if (methodCall.Lhs is not NameSegment nSegExpr) continue;
+            var methodName = nSegExpr.Name;
+            var method = _declaredMethods.FirstOrDefault(m => m.Name == methodName);
+            if (method == null) continue;
+            
+            foreach (var m in _declaredMethods) {
+                if (m == method) continue;
+                
+                var m1InTypes = method.Ins.Select(o => o.Type.ToString()).ToList();
+                var m2InTypes = m.Ins.Select(o => o.Type.ToString()).ToList();
+                if (!m1InTypes.SequenceEqual(m2InTypes)) continue;
+                
+                if (method is Method m1 && m is Method m2) { // functions don't support a list of outputs
+                    var m1OutTypes = m1.Outs.Select(o => o.Type.ToString()).ToList();
+                    var m2OutTypes = m2.Outs.Select(o => o.Type.ToString()).ToList();
+                    if (!m1OutTypes.SequenceEqual(m2OutTypes)) continue;
+                } else if (method is Function f1 && m is Function f2) {
+                    if (f1.ResultType.ToString() != f2.ResultType.ToString()) continue;
+                } else {
+                    continue;
+                }
+                
+                AddTarget(($"{methodCall.Center.pos}", "MCR", $"{m.Name}"));
+            }
+        }
+        
+        _methodCalls = [];
+        _declaredMethods = [];
+    }
+
+    private void ScanMVRTargets(ConcreteAssignStatement cAStmt) {
+        if (!ShouldImplement("MVR") || cAStmt.Lhss.Count == 0) 
+            return;
+
+        var varsArg = "";
+        foreach (var lhs in cAStmt.Lhss) {
+            var selectedVar = "";
+            foreach (var var in _currentScopeVars) {
+                if (var.Value.ToString() != lhs.Type.ToString())
+                    continue;
+                selectedVar = var.Key;
+                break;
+            }
+
+            if (selectedVar == "") return;
+            varsArg = varsArg == "" ? $"{selectedVar}" : $"{varsArg}-{selectedVar}";
+        }
+        
+        AddTarget((_childMethodCallPos, "MVR", varsArg));
+    }
+
+    private void ScanMVRTargets(SuffixExpr suffixExpr) {
+        if (!ShouldImplement("MVR"))
+            return;
+        
+        foreach (var var in _currentScopeVars) {
+            if (suffixExpr.Type == null || var.Value.ToString() != suffixExpr.Type.ToString())
+                continue;
+            AddTarget((_childMethodCallPos, "MVR", var.Key));
+        }
+    }
+
+    private void ScanSARTargets(ApplySuffix appSufExpr) {
+        if (!ShouldImplement("SAR")) return;
+
+        for (var i = 0; i < appSufExpr.Bindings.ArgumentBindings.Count; i++) {
+            for (var j = i + 1; j < appSufExpr.Bindings.ArgumentBindings.Count; j++) {
+                var b1 = appSufExpr.Bindings.ArgumentBindings[i];
+                var b2 = appSufExpr.Bindings.ArgumentBindings[j];
+                if (b1.Actual.Type.ToString() != b2.Actual.Type.ToString()) 
+                    continue;
+                AddTarget(($"{b1.Actual.Center.pos}", "SAR", $"{b2.Actual.Center.pos}"));
+            }
+        }
+    }
+
+    private void ScanDCRTargets(ApplySuffix appSufExpr) {
+        if (!ShouldImplement("DCR") || appSufExpr.Type.AsDatatype == null) return;
+        
+        if (appSufExpr.Lhs is not NameSegment nSegExpr) return;
+        var dtCtor = nSegExpr.Name;
+        var numArgs = appSufExpr.Bindings.ArgumentBindings.Count;
+        var argTypes = appSufExpr.Bindings.ArgumentBindings.Select(a => a.Actual.Type).ToList();
+        
+        foreach (var ctor in appSufExpr.Type.AsDatatype.Ctors) {
+            if (ctor.Name == dtCtor || ctor.Formals.Count != numArgs) continue;
+            var signatureMatches = true;
+            foreach (var (formal, i) in ctor.Formals.Select((f, i) => (f, i))) {
+                if (formal.Type.ToString() == argTypes[i].ToString()) continue;
+                signatureMatches = false;
+                break;
+            }
+            
+            if (signatureMatches)
+                AddTarget(($"{appSufExpr.Center.pos}", "DCR", $"{ctor.Name}"));
+        }
+    }
+    
+    private void ScanDCRTargets(NameSegment nSegExpr) {
+        if (!ShouldImplement("DCR") || _skipChildDCRMutation || nSegExpr.Type.AsDatatype == null) 
+            return;
+        
+        var dtCtor = nSegExpr.Name;
+        foreach (var ctor in nSegExpr.Type.AsDatatype.Ctors) {
+            if (ctor.Name != dtCtor && ctor.Formals.Count == 0)
+                AddTarget(($"{nSegExpr.Center.pos}", "DCR", $"{ctor.Name}"));
+        }
+    }
+    
+    private void ScanFARTargets() {
+        if (!ShouldImplement("FAR")) return;
+
+        foreach (var fieldAccess in _accessedClassFields) {
+            var classDecl1 = fieldAccess.Lhs.Type?.AsTopLevelTypeWithMembers;
+            if (classDecl1 == null) continue;
+            var parents = classDecl1.ParentTraitHeads.Select(t => t.ToString()).ToList();
+            
+            foreach (var field in _classFields) {
+                if (field.Item1 == fieldAccess.SuffixName) continue;
+                var classDecl2 = field.Item2;
+                
+                if ((classDecl1.ToString() == classDecl2.ToString() || parents.Contains(classDecl2.ToString())) &&
+                    fieldAccess.Type.ToString() == field.Item3.ToString())
+                    AddTarget(($"{fieldAccess.Center.pos}", "FAR", field.Item1));
+            }
+        }
+    }
+
+    private void ScanTARTargets(ExprDotName exprDName) {
+        if (!ShouldImplement("TAR")) return;
+
+        if (!(exprDName.Lhs is NameSegment nSegExpr && nSegExpr.Type is UserDefinedType uType &&
+              uType.ResolvedClass != null && uType.ResolvedClass is TupleTypeDecl tupleDecl))
+            return;
+        var dims = tupleDecl.Dims;
+        if (!int.TryParse(exprDName.SuffixName, out var indexAccess)) 
+            return;
+
+        for (int i = 0; i < dims; i++) {
+            if (i == indexAccess)
+                continue;
+            AddTarget(($"{exprDName.Center.pos}", "TAR", $"{i}"));
+        }
+    }
+
+    private void ScanPRVTargets() {
+        if (!ShouldImplement("PRV")) return;
+        
+        foreach (var childClassVar1 in _childClassAccessedVariables) {
+            foreach (var childClassVar2 in _currentScopeChildClassVariables) {
+                if (childClassVar1.Item1 == childClassVar2.Key) continue;
+                
+                var var1Class = childClassVar1.Item3.AsTopLevelTypeWithMembers.Name;
+                var var1Parents = childClassVar1.Item3.AsTopLevelTypeWithMembers.ParentTraitHeads;
+                var var2Class = childClassVar2.Value.AsTopLevelTypeWithMembers.Name;
+                var var2Parents = childClassVar2.Value.AsTopLevelTypeWithMembers.ParentTraitHeads;
+                if (var1Parents.All(var2Parents.Contains) && 
+                    var1Parents.Count == var2Parents.Count && 
+                    var1Class != var2Class)
+                {
+                    AddTarget(($"{childClassVar1.Item2}", "PRV", childClassVar2.Key));
+                }
+            }
+        }
+    }
+    
+    private string PrimitiveTypeToStr(Type type) {
+        if (type.IsIntegerType) return "int";
+        if (type.IsRealType) return "real";
+        if (type.IsBitVectorType) return "bv";
+        if (type.IsBoolType) return "bool";
+        if (type.IsCharType) return "char";
+        return type.IsStringType ? "string" : "";
+    }
+    
+    private string TypeToStr(Type type) {
+        return type switch {
+            IntType => "int",
+            RealType => "real",
+            BitvectorType => "bv",
+            BoolType => "bool",
+            CharType => "char", 
+            SetType => "set", 
+            MultiSetType => "multiset",
+            SeqType => "seq",
+            MapType => "map",
+            UserDefinedType uType => uType.Name == "string" ? 
+                "string" : 
+                uType.Name == "nat" ? "nat" : "",
+            _ => "",
+        };
+    }
+
+    /// -------------------------------------
+    /// Group of overriden top level visitors
+    /// -------------------------------------
+    public override void Find(ModuleDefinition module) {
+        base.Find(module);
+        ScanFARTargets();
+    }
+
+    protected override void HandleDefaultClassDecl(ModuleDefinition module) {
+        base.HandleDefaultClassDecl(module);       
+        ScanMCRTargets();
+    }
+    
+    protected override void HandleMemberDecls(TopLevelDeclWithMembers decl) {
+        foreach (var member in decl.Members) {
+            if (mutationTargetURI != "" && !member.Origin.Uri.LocalPath.Contains(mutationTargetURI))
+                continue;
+            
+            if (decl is ClassLikeDecl clDecl && member is Field f)
+                _classFields.Add((f.Name, clDecl, f.Type));
+            
+            if (member is not ConstantField cf || cf.Rhs == null || !IsFieldOriginal(cf)) 
+                continue;
+            
+            if (ShouldImplement("SDL")) {
+                var fieldType = TypeToStr(cf.Type);
+                if (fieldType != "")
+                    AddTarget(($"{cf.Center.pos}", "SDL", ""));
+            }
+            
+            if (!_currentScopeVars.ContainsKey(cf.Name)) 
+                _currentScopeVars.Add(cf.Name, cf.Type);
+            var classDecl = cf.Type.AsTopLevelTypeWithMembers;
+            if (classDecl != null && classDecl is ClassDecl &&
+                classDecl.ParentTraitHeads.Count > 0 &&
+                !_currentScopeChildClassVariables.ContainsKey(cf.Name)) 
+            {
+                _currentScopeChildClassVariables.Add(cf.Name, cf.Type);
+            }
+        }
+        base.HandleMemberDecls(decl);
+        
+        ScanMCRTargets();
+        ScanPRVTargets();
+        _childClassAccessedVariables = [];
+    }
+    
+    protected override void HandleMethod(Method method) {
+        _declaredMethods.Add(method);
+        
+        var methodIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
+        var methodIndependentChildClassVars = new Dictionary<string, Type>(_currentScopeChildClassVariables);
+        foreach (var formal in method.Ins) {
+            if (!_currentScopeVars.ContainsKey(formal.Name))
+                _currentScopeVars.Add(formal.Name, formal.Type);
+            
+            var classDecl = formal.Type.AsTopLevelTypeWithMembers;
+            if (classDecl != null && classDecl is ClassDecl && 
+                classDecl.ParentTraitHeads.Count > 0 && 
+                !_currentScopeChildClassVariables.ContainsKey(formal.Name))
+            {
+                _currentScopeChildClassVariables.Add(formal.Name, formal.Type);
+            }
+        }
+        base.HandleMethod(method);
+        ScanPRVTargets();
+        _currentScopeVars = methodIndependentVars;
+        _currentScopeChildClassVariables = methodIndependentChildClassVars;
+        _childClassAccessedVariables = [];
+        _prevVarDeclStmt = null;
+    }
+    
+    protected override void HandleFunction(Function function) {
+        _declaredMethods.Add(function);
+        base.HandleFunction(function);
+        _childMethodCallPos = "";
+    }
+
+    /// -------------------------------------
+    /// Group of overriden statement visitors
+    /// -------------------------------------
+    protected override void HandleStatement(Statement stmt) {
+        if (!IsStatementOriginal(stmt))
+            return;
+        
+        var prevChildMethodCallPos = _childMethodCallPos;
+        _childMethodCallPos = "";
+        base.HandleStatement(stmt);
+        _childMethodCallPos = prevChildMethodCallPos;
+    }
+    
+    protected override void HandleBlock(List<Statement> statements) {
+        var blockIndependentVars = new Dictionary<string, Type>(_currentScopeVars);
+        var blockIndependentChildClassVars = new Dictionary<string, Type>(_currentScopeChildClassVariables);
+        var blockIndependentPrevVarDecl = _prevVarDeclStmt;
+        _prevVarDeclStmt = null;
+        base.HandleBlock(statements);
+        ScanPRVTargets();
+        _currentScopeVars = blockIndependentVars;
+        _currentScopeChildClassVariables = blockIndependentChildClassVars;
+        _prevVarDeclStmt = blockIndependentPrevVarDecl;
+        _childClassAccessedVariables = [];
+    }
+    
+    protected override void VisitStatement(ConcreteAssignStatement cAStmt) { }
+
+    private void VisitLhss(ConcreteAssignStatement cAStmt) {
+        foreach (var lhs in cAStmt.Lhss) {
+            if (lhs is NameSegment nSegExpr && !_currentScopeVars.ContainsKey(nSegExpr.Name))
+                _currentScopeVars.Add(nSegExpr.Name, nSegExpr.Type);
+        }
+    }
+    
+    protected override void VisitStatement(AssignStatement aStmt) {
+        if (ContainsLemmaChild(aStmt)) return;
+        base.VisitStatement(aStmt);
+        VisitLhss(aStmt);
+        
+        if (_childMethodCallPos != "") // rhs is method call
+            ScanMethodTargets(aStmt);
+        _childMethodCallArgTypes = [];
+        _childExprDotName = null;
+    }
+    
+    protected override void VisitStatement(AssignSuchThatStmt aStStmt) {
+        base.VisitStatement(aStStmt);
+        VisitLhss(aStStmt);
+
+        if (_childMethodCallPos != "") // rhs is method call
+            ScanMethodTargets(aStStmt);
+        _childMethodCallArgTypes = [];
+        _childExprDotName = null;
+    }
+    
+    protected override void VisitStatement(SingleAssignStmt sAStmt) {
+        HandleRhsList([sAStmt.Rhs]);
+    }
+
+    protected override void VisitStatement(VarDeclStmt vDeclStmt) {
+        if (vDeclStmt.IsGhost) return;
+        base.VisitStatement(vDeclStmt);
+
+        bool canApplySWV = _prevVarDeclStmt != null && vDeclStmt.Assign is AssignStatement && 
+                           _prevVarDeclStmt.Assign is AssignStatement && 
+                           vDeclStmt.Locals.Count == _prevVarDeclStmt.Locals.Count;
+        
+        foreach (var (var, i) in vDeclStmt.Locals.Select((var, i) => (var, i)).ToList()) {
+            if (canApplySWV && var.Type.ToString() != _prevVarDeclStmt?.Locals[i].Type.ToString())
+                canApplySWV = false;
+            
+            if (!_currentScopeVars.ContainsKey(var.Name))
+                _currentScopeVars.Add(var.Name, var.Type);
+            
+            var classDecl = var.Type.AsTopLevelTypeWithMembers;
+            if (classDecl != null && classDecl is ClassDecl && 
+                classDecl.ParentTraitHeads.Count > 0 && 
+                !_currentScopeChildClassVariables.ContainsKey(var.Name))
+            {
+                _currentScopeChildClassVariables.Add(var.Name, var.Type);
+            }
+        }
+        
+        if (canApplySWV && ShouldImplement("SWV"))
+            AddTarget(($"{vDeclStmt.Center.pos}", "SWV", $"{_prevVarDeclStmt?.Center.pos}"));
+        _prevVarDeclStmt = vDeclStmt;
+    }
+
+    /// --------------------------------------
+    /// Group of overriden expression visitors
+    /// --------------------------------------
+    protected override void VisitExpression(LiteralExpr litExpr) {
+        if (!((litExpr.Value is BigInteger bi && bi == BigInteger.Zero) || 
+              (litExpr.Value is BigDec bd && bd == BigDec.ZERO))) {
+            ScanUOITargets(litExpr);
+        }
+        ScanLVRTargets(litExpr);
+    }
+    
+    protected override void VisitExpression(BinaryExpr bExpr) {
+        ScanUOITargets(bExpr);
+        ScanEVRTargets(bExpr);
+        base.VisitExpression(bExpr);
+    }
+    
+    protected override void VisitExpression(UnaryExpr uExpr) {
+        _skipChildUOIMutation = true;
+        ScanUODTargets(uExpr);
+        ScanEVRTargets(uExpr);
+        base.VisitExpression(uExpr);
+    }
+    
+    protected override void VisitExpression(ParensExpression pExpr) {
+        ScanUOITargets(pExpr);
+        _skipChildUOIMutation = true;
+        base.VisitExpression(pExpr);
+    }
+    
+    protected override void VisitExpression(NegationExpression nExpr) {
+        _skipChildUOIMutation = true;
+        base.VisitExpression(nExpr);
+    }
+    
+    protected override void VisitExpression(ChainingExpression cExpr) {
+        ScanUOITargets(cExpr);
+        ScanEVRTargets(cExpr);
+        foreach (var operand in cExpr.Operands) {
+            if (operand is not NegationExpression)
+                ScanUOITargets(operand);
+            
+            if (operand is LiteralExpr litExpr) {
+                ScanLVRTargets(litExpr);
+            } else if (operand is not NegationExpression) {
+                ScanEVRTargets(operand);
+            }
+            
+            if (operand is NameSegment nSegExpr)
+                ScanVERTargets(nSegExpr);
+            if (operand is SuffixExpr suffixExpr && !_skipChildFARMutation && 
+                suffixExpr is ExprDotName exprDName && exprDName.Lhs is NameSegment nSegExprLhs && 
+                nSegExprLhs.Type.AsTopLevelTypeWithMembers != null && nSegExprLhs.Type.AsTopLevelTypeWithMembers is ClassLikeDecl)
+            {
+                _accessedClassFields.Add(exprDName);
+            }
+        }
+    }
+
+    protected override void VisitExpression(NameSegment nSegExpr) {
+        if (!_skipChildVERMutation)
+            ScanVERTargets(nSegExpr);
+        
+        var classDecl = nSegExpr.Type.AsTopLevelTypeWithMembers;
+        if (classDecl != null && classDecl is ClassDecl && 
+            classDecl.ParentTraitHeads.Count > 0 && 
+            !_childClassAccessedVariables.Contains((nSegExpr.Name, nSegExpr.Center.pos, nSegExpr.Type)))
+        {
+            _childClassAccessedVariables.Add((nSegExpr.Name, nSegExpr.Center.pos, nSegExpr.Type));
+        }
+        
+        ScanUOITargets(nSegExpr);
+        ScanEVRTargets(nSegExpr);
+        ScanDCRTargets(nSegExpr);
+    }
+    
+    protected override void VisitExpression(LetExpr ltExpr) {
+        ScanUOITargets(ltExpr);
+        ScanEVRTargets(ltExpr);
+        base.VisitExpression(ltExpr);
+    }
+    
+    protected override void VisitExpression(LetOrFailExpr ltOrFExpr) {
+        ScanUOITargets(ltOrFExpr);
+        ScanEVRTargets(ltOrFExpr);
+        base.VisitExpression(ltOrFExpr);
+    }
+    
+    protected override void VisitExpression(ApplyExpr appExpr) {
+        ScanUOITargets(appExpr);
+        ScanEVRTargets(appExpr);
+        base.VisitExpression(appExpr);
+    }
+    
+    protected override void VisitExpression(SuffixExpr suffixExpr) {
+        _childMethodCallPos = $"{suffixExpr.Center.pos}";
+        if (suffixExpr is ApplySuffix appSufExpr) {
+            if (appSufExpr.Lhs is NameSegment)
+                _methodCalls.Add(appSufExpr);
+            if (appSufExpr.Type != null && appSufExpr.Type.IsDatatype)
+                ScanDCRTargets(appSufExpr);
+            foreach (var binding in appSufExpr.Bindings.ArgumentBindings) {
+                _childMethodCallArgTypes.Add(TypeToStr(binding.Actual.Type));
+            }
+            ScanSARTargets(appSufExpr);
+
+            _skipChildFARMutation = true;
+        }
+        
+        if (suffixExpr.Lhs is ExprDotName exprDNameLhs)
+            _childExprDotName = exprDNameLhs;
+        if (suffixExpr is ExprDotName exprDName) {
+            ScanTARTargets(exprDName);
+            
+            if (!_skipChildFARMutation && exprDName.Lhs is NameSegment nSegExpr && 
+                nSegExpr.Type.AsTopLevelTypeWithMembers != null && 
+                nSegExpr.Type.AsTopLevelTypeWithMembers is ClassLikeDecl) {
+                _accessedClassFields.Add(exprDName);
+            }
+        }
+        
+        ScanMethodTargets(suffixExpr);
+        ScanUOITargets(suffixExpr);
+        ScanEVRTargets(suffixExpr);
+        _skipChildEVRMutation = true;
+        _skipChildVERMutation = true;
+        _skipChildDCRMutation = true;
+        var prevChildMethodCallPos = _childMethodCallPos;
+        base.VisitExpression(suffixExpr);
+        _childMethodCallPos = prevChildMethodCallPos;
+        _skipChildEVRMutation = false;
+        _skipChildVERMutation = false;
+        _skipChildDCRMutation = false;
+        _skipChildFARMutation = false;
+    }
+    
+    protected override void VisitExpression(FunctionCallExpr fCallExpr) {
+        ScanUOITargets(fCallExpr);
+        ScanEVRTargets(fCallExpr);
+        base.VisitExpression(fCallExpr);
+    }
+    
+    protected override void VisitExpression(MemberSelectExpr mSelExpr) {
+        ScanUOITargets(mSelExpr);
+        ScanEVRTargets(mSelExpr);
+        base.VisitExpression(mSelExpr);
+    }
+    
+    protected override void VisitExpression(ITEExpr iteExpr) {
+        ScanUOITargets(iteExpr);
+        ScanEVRTargets(iteExpr);
+        base.VisitExpression(iteExpr);
+    }
+    
+    protected override void VisitExpression(MatchExpr mExpr) {
+        ScanUOITargets(mExpr);
+        ScanEVRTargets(mExpr);
+        base.VisitExpression(mExpr);
+    }
+    
+    protected override void VisitExpression(NestedMatchExpr nMExpr) {
+        ScanUOITargets(nMExpr);
+        ScanEVRTargets(nMExpr);
+        base.VisitExpression(nMExpr);
+    }
+    
+    protected override void VisitExpression(DisplayExpression dExpr) {
+        ScanUOITargets(dExpr);
+        ScanCIRTargets(dExpr);
+        base.VisitExpression(dExpr);
+    }
+    
+    protected override void VisitExpression(MapDisplayExpr mDExpr) {
+        ScanUOITargets(mDExpr);
+        ScanCIRTargets(mDExpr);
+        base.VisitExpression(mDExpr);
+    }
+    
+    protected override void VisitExpression(SeqConstructionExpr seqCExpr) {
+        ScanUOITargets(seqCExpr);
+        ScanEVRTargets(seqCExpr);
+        base.VisitExpression(seqCExpr);
+    }
+    
+    protected override void VisitExpression(MultiSetFormingExpr mSetFExpr) {
+        ScanUOITargets(mSetFExpr);
+        ScanEVRTargets(mSetFExpr);
+        base.VisitExpression(mSetFExpr);
+    }
+    
+    protected override void VisitExpression(SeqSelectExpr seqSExpr) {
+        ScanUOITargets(seqSExpr);
+        ScanEVRTargets(seqSExpr);
+        _skipChildEVRMutation = true;
+        base.VisitExpression(seqSExpr);
+        _skipChildEVRMutation = false;
+    }
+    
+    protected override void VisitExpression(MultiSelectExpr mSExpr) {
+        ScanUOITargets(mSExpr);
+        ScanEVRTargets(mSExpr);
+        _skipChildEVRMutation = true;
+        base.VisitExpression(mSExpr);
+        _skipChildEVRMutation = false;
+    }
+    
+    protected override void VisitExpression(SeqUpdateExpr seqUExpr) {
+        ScanUOITargets(seqUExpr);
+        ScanEVRTargets(seqUExpr);
+        base.VisitExpression(seqUExpr);
+    }
+    
+    protected override void VisitExpression(ComprehensionExpr compExpr) {
+        ScanUOITargets(compExpr);
+        ScanEVRTargets(compExpr);
+        base.VisitExpression(compExpr);
+    }
+    
+    protected override void VisitExpression(DatatypeUpdateExpr dtUExpr) {
+        ScanUOITargets(dtUExpr);
+        ScanEVRTargets(dtUExpr);
+        base.VisitExpression(dtUExpr);
+    }
+    
+    protected override void VisitExpression(DatatypeValue dtValue) {
+        ScanUOITargets(dtValue);
+        ScanEVRTargets(dtValue);
+        base.VisitExpression(dtValue);
+    }
+    
+    protected override void VisitExpression(StmtExpr stmtExpr) {
+        ScanUOITargets(stmtExpr);
+        ScanEVRTargets(stmtExpr);
+        base.VisitExpression(stmtExpr);
+    }
+    
+    /// ----------------------
+    /// Group of visitor utils
+    /// ----------------------
+    protected override void HandleAssignmentRhs(AssignmentRhs aRhs) {
+        if (aRhs is ExprRhs exprRhs) {
+            HandleExpression(exprRhs.Expr);
+        } else if (aRhs is TypeRhs tpRhs) {
+            ScanCIRTargets(tpRhs);
+            ScanEVRTargets(tpRhs);
+            
+            var elInit = tpRhs.ElementInit;
+            if (tpRhs.ArrayDimensions != null) {
+                HandleExprList(tpRhs.ArrayDimensions);
+            } if (elInit != null && IsWorthVisiting(elInit.StartToken.pos, elInit.EndToken.pos)) {
+                HandleExpression(elInit);
+            } if (tpRhs.InitDisplay != null) {
+                HandleExprList(tpRhs.InitDisplay);
+            } if (tpRhs.Bindings != null) {
+                HandleActualBindings(tpRhs.Bindings);
+            }
+        }
+    }
+    
+    protected override void HandleActualBindings(ActualBindings bindings) {
+        var prevSkipEVRMutation = _skipChildEVRMutation;
+        var prevSkipVERMutattion = _skipChildVERMutation;
+        _skipChildEVRMutation = false;
+        _skipChildVERMutation = false;
+        
+        foreach (var binding in bindings.ArgumentBindings) {
+            if (!IsWorthVisiting(binding.Actual.StartToken.pos, binding.Actual.EndToken.pos))
+                continue;
+            HandleExpression(binding.Actual);
+        }
+        
+        _skipChildEVRMutation = prevSkipEVRMutation;
+        _skipChildVERMutation = prevSkipVERMutattion;
+    }
+}

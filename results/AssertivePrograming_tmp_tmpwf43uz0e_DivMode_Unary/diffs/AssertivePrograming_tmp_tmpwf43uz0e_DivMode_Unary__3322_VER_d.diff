@@ -1,0 +1,11 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary.dfy	2026-05-24 22:03:52.342035151 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary__3322_VER_d.dfy	2026-05-24 22:08:00.234460665 +0100
+@@ -146,7 +146,7 @@
+       decreases x0
+     {
+       d := Suc(d);
+-      x0 := Sub(x0, y);
++      x0 := Sub(d, y);
+     }
+     m := x0;
+   }

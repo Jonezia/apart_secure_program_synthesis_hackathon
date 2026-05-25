@@ -1,0 +1,11 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary.dfy	2026-05-24 22:03:52.342035151 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary__3143_DCR_Zero.dfy	2026-05-24 22:05:51.705716327 +0100
+@@ -137,7 +137,7 @@
+ {
+   if Less(x, y) {
+     d := Zero;
+-    m := x;
++    m := Zero;
+   } else {
+     var x0: Unary := x;
+     d := Zero;

@@ -1,0 +1,12 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/703FinalProject_tmp_tmpr_10rn4z_DP-GD.dfy	2026-05-24 21:53:10.874687088 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/703FinalProject_tmp_tmpr_10rn4z_DP-GD__381-398_SWS_.dfy	2026-05-24 21:53:19.043724396 +0100
+@@ -9,8 +9,8 @@
+ {
+   var thetha: array<real> := new real[iterations + 1];
+   thetha[0] := *;
+-  var alpha: real := 0.0;
+   var tau: real := *;
++  var alpha: real := 0.0;
+   assume tau >= 0.0;
+   var t: int := 0;
+   var constant: real := size as real * tau;

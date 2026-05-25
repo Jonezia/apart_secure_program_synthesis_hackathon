@@ -1,0 +1,11 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/703FinalProject_tmp_tmpr_10rn4z_DP-GD.dfy	2026-05-24 21:53:10.874687088 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/703FinalProject_tmp_tmpr_10rn4z_DP-GD__669_LVR_1.0.dfy	2026-05-24 21:55:08.555242484 +0100
+@@ -20,7 +20,7 @@
+   {
+     var i: int := 0;
+     var beta: real := 0.0;
+-    var summation_gradient: real := 0.0;
++    var summation_gradient: real := 1.0;
+     while i < size
+       invariant i <= size
+       invariant beta == i as real * tau

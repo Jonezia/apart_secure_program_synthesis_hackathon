@@ -1,0 +1,53 @@
+{
+  "clusters": {
+    "C001": {
+      "id": "C001",
+      "title": "Unconstrained internal loop variables",
+      "description": "The loop invariants and initialization of alpha do not sufficiently constrain its value relative to the progression of i.",
+      "mutants": [
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__365_SLD_.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__316_LVR_1.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__356_MRR_real.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__341-367_AOI_.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__341-367_EVR_real.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__357_VER_q.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__371_SWV_321.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__388_LVR_1.0__371_SWV_321.dfy"
+      ],
+      "mutant_count": 8
+    },
+    "C002": {
+      "id": "C002",
+      "title": "Missing postconditions on output array",
+      "description": "The specification lacks a postcondition defining the expected values of the 'out' array, allowing partial or complete omission of assignments.",
+      "mutants": [
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__551-559_SDL_.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__667-687_SDL_.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__682_AOR_Sub.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__682_AOR_Mul.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__388_LVR_1.0.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__388_LVR_-1.0.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__415_LVR_1.0.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__415_LVR_-1.0.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__677-684_AOI_.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__677-684_EVR_real.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__677-680_AOI_.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__677-680_EVR_real.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__677_VER_q_hat.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__677_VER_out.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__684_VER_alpha.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__684_VER_eta_hat.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__684-684_AOI_.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__684-684_EVR_real.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__316_LVR_1__677_VER_q_hat.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__667-687_SDL__588-626_SWS.dfy",
+        "703FinalProject_tmp_tmpr_10rn4z_gaussian__321-368_SWS__677-680_EVR_real.dfy"
+      ],
+      "mutant_count": 21
+    }
+  },
+  "total_processed": 38,
+  "total_weak_spec": 29,
+  "total_equivalent": 9,
+  "next_cluster_id": 3
+}

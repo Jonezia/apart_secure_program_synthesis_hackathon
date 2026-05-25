@@ -1,0 +1,10 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary.dfy	2026-05-24 22:03:52.342035151 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary__3293-3304_SDL_.dfy	2026-05-24 22:04:10.620138730 +0100
+@@ -145,7 +145,6 @@
+       invariant Add(Mul(d, y), x0) == x
+       decreases x0
+     {
+-      d := Suc(d);
+       x0 := Sub(x0, y);
+     }
+     m := x0;

@@ -1,0 +1,12 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/703FinalProject_tmp_tmpr_10rn4z_DP-GD.dfy	2026-05-24 21:53:10.874687088 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/703FinalProject_tmp_tmpr_10rn4z_DP-GD__973-990_SWS_.dfy	2026-05-24 21:53:48.322859720 +0100
+@@ -25,8 +25,8 @@
+       invariant i <= size
+       invariant beta == i as real * tau
+     {
+-      var gradient: real := *;
+       var eta: real := *;
++      var gradient: real := *;
+       beta := beta + tau;
+       var eta_hat: real := -gradient_norm_bound;
+       assert gradient_norm_bound + eta_hat == 0.0;

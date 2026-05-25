@@ -1,0 +1,32 @@
+﻿using Microsoft.Dafny;
+
+namespace MutDafny.Mutator;
+
+// this mutation operator replaces a relational or conditional binary expression with true or false
+public class BinaryOpBoolMutator(string mutationTargetPos, string val, ErrorReporter reporter) 
+    : ExprReplacementMutator(mutationTargetPos, reporter)
+{
+    protected override Expression CreateMutatedExpression(Expression originalExpr) {
+        TargetExpression = null;
+        var mutatedExpr = new LiteralExpr(originalExpr.Origin, bool.Parse(val));
+        MutantGenerator.NumMutations++;
+        MutantGenerator.MutatedNodes.Add(mutatedExpr);
+        return mutatedExpr;
+    }
+    
+    private bool IsTarget(BinaryExpr expr) {
+        return expr.Center.pos == int.Parse(MutationTargetPos) && 
+               !AlreadyMutated(expr) && !ContainsMutatedChildren(expr);
+    }
+    
+    /// -----------------
+    /// Overriden visitor
+    /// -----------------
+    protected override void VisitExpression(BinaryExpr bExpr) {
+        if (IsTarget(bExpr)) {
+            TargetExpression = bExpr;
+            return;
+        }
+        base.VisitExpression(bExpr);
+    }
+}

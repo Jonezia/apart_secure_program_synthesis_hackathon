@@ -1,0 +1,9 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/703FinalProject_tmp_tmpr_10rn4z_DP-GD.dfy	2026-05-24 21:53:10.874687088 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/703FinalProject_tmp_tmpr_10rn4z_DP-GD__1441_VER_Para.dfy	2026-05-24 21:58:20.942219186 +0100
+@@ -40,5 +40,5 @@
+   assert t == iterations;
+   assert alpha == iterations as real * constant;
+   Para := thetha[iterations];
+-  PrivacyLost := alpha;
++  PrivacyLost := Para;
+ }

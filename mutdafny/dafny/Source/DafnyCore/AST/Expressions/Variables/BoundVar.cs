@@ -1,0 +1,110 @@
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.Contracts;
+using JetBrains.Annotations;
+
+namespace Microsoft.Dafny;
+
+public class BoundVar : NonglobalVariable {
+  public override bool IsMutable => false;
+
+  public BoundVar(IOrigin origin, string name, Type type, bool isGhost = false)
+    : this(origin, new Name(origin.Center, name), type, isGhost) { }
+
+  [SyntaxConstructor]
+  public BoundVar(IOrigin origin, Name nameNode, Type type, bool isGhost = false)
+    : base(origin, nameNode, type, isGhost) {
+    Contract.Requires(origin != null);
+    Contract.Requires(type != null);
+  }
+}
+
+/// <summary>
+/// A QuantifiedVar is a bound variable used in a quantifier such as "forall x :: ...",
+/// a comprehension such as "set x | 0 <= x < 10", etc.
+/// In addition to its type, which may be inferred, it can have an optional domain collection expression
+/// (x <- C) and an optional range boolean expressions (x | E).
+/// </summary>
+[DebuggerDisplay("Quantified<{name}>")]
+public class QuantifiedVar : BoundVar {
+  public Expression Domain;
+  public Expression Range;
+
+  public QuantifiedVar(IOrigin tok, string name, Type type, Expression domain, Expression range)
+    : base(tok, name, type) {
+    Contract.Requires(tok != null);
+    Contract.Requires(name != null);
+    Contract.Requires(type != null);
+    Domain = domain;
+    Range = range;
+  }
+
+  /// <summary>
+  /// Map a list of quantified variables to an equivalent list of bound variables plus a single range expression.
+  /// The transformation looks like this in general:
+  ///
+  /// x1 <- C1 | E1, ..., xN <- CN | EN
+  ///
+  /// becomes:
+  ///
+  /// x1, ... xN | x1 in C1 && E1 && ... && xN in CN && EN
+  ///
+  /// Note the result will be null rather than "true" if there are no such domains or ranges.
+  /// Some quantification contexts (such as comprehensions) will replace this with "true".
+  /// </summary>
+  public static void ExtractSingleRange(List<QuantifiedVar> qvars, out List<BoundVar> bvars, [CanBeNull] out Expression range) {
+    bvars = [];
+    range = null;
+
+    foreach (var qvar in qvars) {
+      BoundVar bvar = new BoundVar(qvar.Origin, qvar.Name, qvar.SyntacticType);
+      bvars.Add(bvar);
+
+      if (qvar.Domain != null) {
+        // Attach a token wrapper so we can produce a better error message if the domain is not a collection
+        var domainWithToken = QuantifiedVariableDomainCloner.Instance.CloneExpr(qvar.Domain);
+        var inDomainExpr = new BinaryExpr(domainWithToken.Origin.Center, BinaryExpr.Opcode.In, new IdentifierExpr(bvar.Origin, bvar), domainWithToken);
+        range = range == null ? inDomainExpr : new BinaryExpr(domainWithToken.Origin.Center, BinaryExpr.Opcode.And, range, inDomainExpr);
+      }
+
+      if (qvar.Range != null) {
+        // Attach a token wrapper so we can produce a better error message if the range is not a boolean expression
+        var rangeWithToken = QuantifiedVariableRangeCloner.Instance.CloneExpr(qvar.Range);
+        range = range == null ? qvar.Range : new BinaryExpr(rangeWithToken.Origin.Center, BinaryExpr.Opcode.And, range, rangeWithToken);
+      }
+    }
+  }
+}
+
+/// <summary>
+/// An expression introducting bound variables
+/// </summary>
+public interface IBoundVarsBearingExpression {
+  public IEnumerable<BoundVar> AllBoundVars {
+    get;
+  }
+}
+
+class QuantifiedVariableDomainCloner : Cloner {
+  public static QuantifiedVariableDomainCloner Instance = new QuantifiedVariableDomainCloner();
+  private QuantifiedVariableDomainCloner() { }
+  public override IOrigin Origin(IOrigin tok) {
+    if (tok == null) {
+      return null;
+    }
+
+    return new QuantifiedVariableDomainOrigin(tok);
+  }
+}
+
+class QuantifiedVariableRangeCloner : Cloner {
+  public static QuantifiedVariableRangeCloner Instance = new QuantifiedVariableRangeCloner();
+  private QuantifiedVariableRangeCloner() { }
+  public override IOrigin Origin(IOrigin tok) {
+    if (tok == null) {
+      return null;
+    }
+
+    return new QuantifiedVariableRangeOrigin(tok);
+  }
+}

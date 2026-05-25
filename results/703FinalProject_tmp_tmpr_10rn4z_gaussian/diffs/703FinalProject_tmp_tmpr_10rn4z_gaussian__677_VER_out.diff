@@ -1,0 +1,11 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/703FinalProject_tmp_tmpr_10rn4z_gaussian.dfy	2026-05-24 22:00:51.879029738 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/703FinalProject_tmp_tmpr_10rn4z_gaussian__677_VER_out.dfy	2026-05-24 22:02:32.614586852 +0100
+@@ -20,7 +20,7 @@
+     eta_hat := -q_hat[i];
+     alpha := arraySquaredSum(q_hat[..i + 1]);
+     assert q_hat[i] + eta_hat == 0.0;
+-    out[i] := q[i] + eta;
++    out[i] := out[i] + eta;
+     i := i + 1;
+   }
+   assert i == size;

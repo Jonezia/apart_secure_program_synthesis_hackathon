@@ -1,0 +1,82 @@
+﻿using Microsoft.Dafny;
+
+namespace MutDafny.Mutator;
+
+public class MethodBodyReplacementMutator(string mutationTargetPos, string replacementPos, ErrorReporter reporter): Mutator(mutationTargetPos, reporter)
+{
+    private Method? _targetMethod;
+    private Method? _replacementMethod;
+    
+    private bool IsTarget(Method method) {
+        var positions = MutationTargetPos.Split("-");
+        if (positions.Length < 2) return false;
+        var startPosition = int.Parse(positions[0]);
+        var endPosition = int.Parse(positions[1]);
+                
+        return method.StartToken.pos == startPosition && 
+               method.EndToken.pos == endPosition && 
+               !AlreadyMutated(method);
+    }
+    
+    private bool IsReplacement(Method method) {
+        var positions = replacementPos.Split("-");
+        if (positions.Length < 2) return false;
+        var startPosition = int.Parse(positions[0]);
+        var endPosition = int.Parse(positions[1]);
+                
+        return method.StartToken.pos == startPosition && method.EndToken.pos == endPosition;
+    }
+
+    private void ReplaceMethodsBodies() {
+        if (_targetMethod == null || _replacementMethod == null || 
+            _targetMethod.Body == null || _replacementMethod.Body == null) 
+            return;
+
+        MutantGenerator.NumMutations++;
+        var cloner = new Cloner();
+        var targetMethodBody = _targetMethod.Body.Clone(cloner);
+        if (_targetMethod.Body is DividedBlockStmt dBlockStmt1) {
+            dBlockStmt1.Body = _replacementMethod.Body.Body;
+            dBlockStmt1.BodyInit = [];
+            dBlockStmt1.BodyProper = _replacementMethod.Body.Body;
+        } else {
+            _targetMethod.Body = _replacementMethod.Body;
+        }
+        if (_replacementMethod.Body is DividedBlockStmt dBlockStmt2) {
+            dBlockStmt2.Body = targetMethodBody.Body;
+            dBlockStmt2.BodyInit = [];
+            dBlockStmt2.BodyProper = targetMethodBody.Body;
+        } else {
+            _replacementMethod.Body = targetMethodBody;
+        }
+    }
+    
+    /// -----------------
+    /// Overriden visitor
+    /// -----------------
+    protected override void HandleMethod(Method method) {
+        if (IsTarget(method)) {
+            MutantGenerator.MutatedNodes.Add(method);
+            _targetMethod = method;
+            if (_replacementMethod != null) {
+                ReplaceMethodsBodies();
+                TargetStatement = method.Body;
+            }
+        }
+
+        if (IsReplacement(method)) {
+            MutantGenerator.MutatedNodes.Add(method);
+            _replacementMethod = method;
+            if (_targetMethod != null) {
+                ReplaceMethodsBodies();
+                TargetStatement = _targetMethod.Body;
+            }
+        }
+        
+        base.HandleMethod(method);
+    }
+
+    protected override bool IsWorthVisiting(int tokenStartPos, int tokenEndPos) {
+        return true;
+    }
+}

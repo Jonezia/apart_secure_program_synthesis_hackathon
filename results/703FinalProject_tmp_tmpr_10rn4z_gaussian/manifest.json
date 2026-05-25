@@ -1,0 +1,16 @@
+{
+  "stem": "703FinalProject_tmp_tmpr_10rn4z_gaussian",
+  "source": "mutdafny/DafnyBench/DafnyBench/dataset/ground_truth/703FinalProject_tmp_tmpr_10rn4z_gaussian.dfy",
+  "alive": 38,
+  "killed": 110,
+  "timed_out": 0,
+  "invalid": 5,
+  "equivalent": 0,
+  "total": 153,
+  "weak_spec": 29,
+  "thresholds": {
+    "N_true_positive": 256,
+    "M_total": 4096
+  },
+  "timestamp": "2026-05-24T22:03:51"
+}

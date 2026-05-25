@@ -1,0 +1,4 @@
+parsing_time,plugin_time,resolution_time,verification_time,dafny_time
+0.8165,7.7914,111.1174,15.5029,135.22820000000002
+parsing_time,plugin_time,resolution_time,verification_time,dafny_time
+0.9338,7.6846000000000005,108.65070000000001,487.246,604.5151

@@ -1,0 +1,16 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary.dfy	2026-05-24 22:03:52.342035151 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/AssertivePrograming_tmp_tmpwf43uz0e_DivMode_Unary__9131-9498_SDL_.dfy	2026-05-24 22:05:10.532480141 +0100
+@@ -408,13 +408,6 @@
+ 
+ method Main()
+ {
+-  var U3 := Suc(Suc(Suc(Zero)));
+-  assert UnaryToNat(U3) == 3;
+-  var U7 := Suc(Suc(Suc(Suc(U3))));
+-  assert UnaryToNat(U7) == 7;
+-  var d, m := IterativeDivMod(U7, U3);
+-  assert Add(Mul(d, U3), m) == U7 && Less(m, U3);
+-  print "Just as 7 divided by 3 is 2 with a remainder of 1, IterativeDivMod(", U7, ", ", U3, ") is ", d, " with a remainder of ", m;
+ }
+ 
+ datatype Unary = Zero | Suc(pred: Unary)

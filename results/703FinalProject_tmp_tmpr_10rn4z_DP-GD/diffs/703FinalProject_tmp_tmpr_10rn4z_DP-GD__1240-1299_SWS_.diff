@@ -1,0 +1,12 @@
+--- /home/adl/apart-sps-hack/mutdafny/mutants/gts/703FinalProject_tmp_tmpr_10rn4z_DP-GD.dfy	2026-05-24 21:53:10.874687088 +0100
++++ /home/adl/apart-sps-hack/mutdafny/mutants/alive/703FinalProject_tmp_tmpr_10rn4z_DP-GD__1240-1299_SWS_.dfy	2026-05-24 21:54:22.682021581 +0100
+@@ -33,8 +33,8 @@
+       summation_gradient := summation_gradient + gradient + eta;
+       i := i + 1;
+     }
+-    alpha := alpha + beta;
+     thetha[t + 1] := thetha[t] - learning_rate * summation_gradient;
++    alpha := alpha + beta;
+     t := t + 1;
+   }
+   assert t == iterations;
