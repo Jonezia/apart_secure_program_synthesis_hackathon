@@ -1,3 +1,4 @@
 mutdafny/mutants/
 results/
 __pycache__/
+.env
