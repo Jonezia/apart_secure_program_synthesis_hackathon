@@ -408,7 +408,17 @@ Assignment rules:
   this batch that are symptoms of the same new root cause share the same NEW_x id.
 - problem_merges → only when two *existing* problems are actually the same spec gap \
   described differently; may be an empty list.
-- new_problems and problem_merges may both be empty lists.\
+- new_problems and problem_merges may both be empty lists.
+
+Granularity guidance — err on the side of fewer, broader problems:
+- There is no correct number of problems. If every mutant in this batch looks like \
+  a symptom of the same underlying spec gap, emit exactly one problem.
+- Prefer one coarse problem over two fine-grained ones whenever the distinction is \
+  uncertain. The refinement stage can split a problem later if evidence warrants it; \
+  over-splitting on the first pass creates noise that is hard to undo.
+- Only create a separate problem when you are confident the two groups require \
+  *independent* spec clauses to fix — i.e. fixing one would not automatically fix \
+  the other.\
 """
 
 
@@ -655,7 +665,7 @@ class MutantAnalyser:
     """
     Stateful analyser. Two-stage pipeline:
       classify_equiv() — Pass 1, batches ≤5, classifies EQUIV/WEAK_SPEC/CONTEXTUAL
-      assign_problems() — Pass 2, batches ≤20, assigns WEAK_SPEC to problem clusters
+      assign_problems() — Pass 2, batches ≤50, assigns WEAK_SPEC to problem clusters
 
     Pass 2 must only be called after ALL Pass-1 work is complete.
     """
@@ -808,8 +818,8 @@ class MutantAnalyser:
             categ_result_map: dict[str, dict] = {}
             id_map: dict[str, str] = {}
 
-            for i in range(0, len(group), 20):
-                sub = group[i:i + 20]
+            for i in range(0, len(group), 50):
+                sub = group[i:i + 50]
                 try:
                     raw = analyser.generate(
                         _build_categ_prompt(gt_name, sub, cluster_state)

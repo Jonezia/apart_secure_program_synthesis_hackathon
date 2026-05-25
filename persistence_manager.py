@@ -311,6 +311,45 @@ class PersistenceManager:
         consumed = self.consumed_set(stem)
         return [t for t in m.get("targets", []) if t not in consumed]
 
+    def _mutant_name_to_key(self, stem: str, name: str) -> str | None:
+        """Parse a mutant filename back to its target key, or None if unparseable.
+        Expected filename format: <stem>__<pos>_<op>_<arg>.dfy"""
+        prefix = f"{stem}__"
+        if not name.startswith(prefix) or not name.endswith(".dfy") or name.endswith(".equiv.dfy"):
+            return None
+        inner = name[len(prefix):-len(".dfy")]
+        # Split into at most 3 parts: pos, op, arg (arg may contain underscores/hyphens)
+        parts = inner.split("_", 2)
+        if len(parts) < 2:
+            return None
+        pos = parts[0]
+        op = parts[1]
+        arg = parts[2] if len(parts) > 2 else ""
+        return _target_key(pos, op, arg)
+
+    def reconcile_consumed(self, stem: str) -> int:
+        """Scan category directories for existing mutant files and mark their
+        corresponding targets as consumed. Fixes de-synchronisation where mutants
+        were placed in dirs by a prior interrupted run but not recorded as consumed.
+        Returns the number of newly reconciled targets."""
+        m = self.load_manifest(stem)
+        if not m.get("scanned"):
+            return 0
+        target_set = set(m.get("targets", []))
+        already_consumed = self.consumed_set(stem)
+        found_keys: set[str] = set()
+        for cat in CATEGORIES:
+            for name in self.list_mutants(cat, stem):
+                key = self._mutant_name_to_key(stem, name)
+                if key and key in target_set and key not in already_consumed:
+                    found_keys.add(key)
+        if not found_keys:
+            return 0
+        new_consumed = set(m.get("consumed", [])) | found_keys
+        m["consumed"] = [t for t in m.get("targets", []) if t in new_consumed]
+        self.save_manifest(m)
+        return len(found_keys)
+
     def prepare_run(self, source, multi: bool = False) -> dict:
         """Materialise the remaining targets into the active targets.csv and return
         the environment overrides run.sh needs. Call finalize_run() afterwards.

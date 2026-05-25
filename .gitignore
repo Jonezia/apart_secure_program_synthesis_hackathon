@@ -1,2 +1,3 @@
 mutdafny/mutants/
 results/
+__pycache__/

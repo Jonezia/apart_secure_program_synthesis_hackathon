@@ -340,7 +340,7 @@ class Pipeline:
             self._log(f"[refine] fix proposer disabled: {exc}")
         self.engine = RefinementEngine(
             PM, self.fixer, self.analyser, GTS_DIR, log=self._refine_log,
-            allow_overconstrain=app.allow_overconstrain,
+            allow_overconstrain=self.app.allow_overconstrain,
         )
 
     def _refine_log(self, msg: str):
@@ -415,6 +415,12 @@ class Pipeline:
         self._log(f"[launcher] === {fs.path.name} ===")
         PM.ensure_scanned(fs.path)
         self._recount(fs)
+        # Reconcile: detect mutant files already placed in category dirs by a prior
+        # interrupted run that didn't finish updating the manifest consumed list.
+        reconciled = PM.reconcile_consumed(fs.stem)
+        if reconciled:
+            self._log(f"[launcher] reconciled {reconciled} targets already present "
+                      f"in category dirs → marked consumed")
         remaining = PM.remaining_targets(fs.stem)
         if not remaining:
             self._log(f"[launcher] all {len(PM.load_manifest(fs.stem).get('targets', []))} "
@@ -701,8 +707,7 @@ class Pipeline:
                             method = _find_method_at_offset(gt_text, char_offset)
                             if method and _method_has_verify_false(gt_text, method):
                                 # {:verify false}: Dafny skips verification → unkillable.
-                                # Tracked in unverified_methods so warm restarts exclude them
-                                # and fs.alive = total_processed + total_unverified holds.
+                                # Tracked in unverified_methods so warm restarts exclude them.
                                 uvm = fs.problems.setdefault("unverified_methods", {})
                                 vf_key = f"[{method}] (verify_false)"
                                 if vf_key not in uvm:
@@ -741,6 +746,21 @@ class Pipeline:
 
         if uvm_dirty:
             PM.save_problems(fs.stem, fs.problems)
+            # Summarise which methods were pre-filtered so the user can see why mutants
+            # are classified unkillable without waiting for Gemini.
+            uvm = fs.problems.get("unverified_methods", {})
+            no_spec = [(k, v) for k, v in uvm.items() if not v.get("verify_false")]
+            vf     = [(k, v) for k, v in uvm.items() if v.get("verify_false")]
+            if no_spec:
+                detail = ", ".join(
+                    f"{v['name']} ({v['mutant_count']} mutant(s))" for _, v in no_spec
+                )
+                self._log(f"[sweep] UNKILLABLE (no spec): {detail}")
+            if vf:
+                detail = ", ".join(
+                    f"{v['name']} ({v['mutant_count']} mutant(s))" for _, v in vf
+                )
+                self._log(f"[sweep] UNKILLABLE ({{:verify false}}): {detail}")
 
         if new_names:
             with self.app.lock:
